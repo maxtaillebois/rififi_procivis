@@ -434,11 +434,14 @@ function sSelect(){
       txt(p?'J2':'J1',p?x+44:x+3,y+86,{c:col,o:'#1a1020'});}
   });
   if(st.ok[0]&&st.ok[1]){st.w=(st.w||0)+1;if(st.w>40){sel=[st.c[0],mode===2?st.c[1]:sel[1]];
-    if(mode===1){ladder=CH.map((c,i)=>i).filter(i=>i!==sel[0]).sort(()=>Math.random()-.5);step=0;startMatch(sel[0],ladder[0]);}else startMatch(sel[0],sel[1]);}}
+    if(mode===1){ladder=shuf(CH.map((c,i)=>i).filter(i=>i!==sel[0]));if(ladder[0]===lastFirst){const j=1+Math.floor(Math.random()*(ladder.length-1));[ladder[0],ladder[j]]=[ladder[j],ladder[0]];}lastFirst=ladder[0];try{localStorage.setItem('rififi1',lastFirst);}catch(e){}step=0;startMatch(sel[0],ladder[0]);}else startMatch(sel[0],sel[1]);}}
 }
+// tirage au sort équitable (mélange de Fisher-Yates) : adversaires et décors
+function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+let lastFirst=-1,stBag=[];try{const v=localStorage.getItem('rififi1');if(v!==null&&v!=='')lastFirst=+v;}catch(e){}
 function startMatch(a,b){
   P=[newFighter(CH[a],0,false),newFighter(CH[b],1,mode===1)];
-  stageN=(stageN+1+(mode===2?ri(0,3):0))%5;stage=STAGES[stageN];
+  if(!stBag.length){stBag=shuf([0,1,2,3,4]);if(stBag[4]===stageN)[stBag[0],stBag[4]]=[stBag[4],stBag[0]];}stageN=stBag.pop();stage=STAGES[stageN];
   fight={round:1,phase:'intro',pt:0,time:60*60,msg:''};resetRound();go('vs');
 }
 function sVS(){
