@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Du rififi chez Procivis</title>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -12,7 +12,10 @@
 <style>
 html,body{margin:0;height:100%;background:#08070f;overflow:hidden}
 /* la scène remplit tout l'écran ; sur téléphone tenu à la verticale elle est tournée d'un quart de tour */
-#stage{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;transform-origin:0 0;
+html{touch-action:none;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* cadre fixe, exactement à la taille de l'écran : rien ne dépasse, donc rien à faire défiler ni à zoomer */
+#root{position:fixed;left:0;top:0;right:0;bottom:0;overflow:hidden;touch-action:none}
+#stage{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;transform-origin:50% 50%;
   --sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px);--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
 body.rot #stage{--sl:env(safe-area-inset-top,0px);--sr:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-right,0px);--sb:env(safe-area-inset-left,0px)}
 canvas{image-rendering:pixelated;image-rendering:crisp-edges;background:#000;box-shadow:0 0 0 4px #24162c,0 0 80px #000}
@@ -40,12 +43,12 @@ body.touch #top{display:flex}
 </style>
 </head>
 <body>
-<div id="stage">
+<div id="root"><div id="stage">
 <canvas id="c" width="640" height="360"></canvas>
 <div id="top"><div class="sb" data-k="Escape" id="bq">PAUSE</div><div class="sb" id="bm">SON</div><div class="sb" id="bf">ÉCRAN</div></div>
 <div id="pad"><i></i><i></i><i></i><i></i><b></b></div>
 <div id="btn"><div class="tb" data-k="KeyF" id="bp">POING</div><div class="tb" data-k="KeyG" id="bk">PIED</div><div class="tb" data-k="KeyH" id="bs">SPÉCIAL</div></div>
-</div>
+</div></div>
 <script>
 'use strict';
 /* ============================================================
@@ -58,12 +61,14 @@ const A={"sheet":{"aurel":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABgAAAAR
 const W=640,H=360,FLOOR=318,SW=960,OUT='#1a1020',PINK='#ff2d87',YEL='#ffd23b';
 const cv=document.getElementById('c'),g=cv.getContext('2d');
 g.imageSmoothingEnabled=false;
-const stageEl=document.getElementById('stage');let ROT=false;
-function fit(){const t=document.body.classList.contains('touch');ROT=t&&innerHeight>innerWidth;document.body.classList.toggle('rot',ROT);
-  const sw=ROT?innerHeight:innerWidth,sh=ROT?innerWidth:innerHeight;
-  stageEl.style.width=sw+'px';stageEl.style.height=sh+'px';stageEl.style.transform=ROT?'translateX('+innerWidth+'px) rotate(90deg)':'';
+const stageEl=document.getElementById('stage'),rootEl=document.getElementById('root');let ROT=false;
+// taille prise sur le cadre fixe (et non sur innerWidth, qui rétrécit quand la page est zoomée sur iPhone)
+function fit(){const t=document.body.classList.contains('touch'),vw=rootEl.clientWidth||innerWidth,vh=rootEl.clientHeight||innerHeight;
+  ROT=t&&vh>vw;document.body.classList.toggle('rot',ROT);
+  const sw=ROT?vh:vw,sh=ROT?vw:vh;
+  stageEl.style.width=sw+'px';stageEl.style.height=sh+'px';stageEl.style.left=(vw-sw)/2+'px';stageEl.style.top=(vh-sh)/2+'px';stageEl.style.transform=ROT?'rotate(90deg)':'';
   let s=Math.min(sw/W,sh/H);if(s>=1&&!t&&Math.floor(s)/s>.88)s=Math.floor(s);cv.style.width=W*s+'px';cv.style.height=H*s+'px';}
-addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,250));fit();
+addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,250));if(window.ResizeObserver)new ResizeObserver(fit).observe(rootEl);fit();
 const rnd=(a,b)=>a+Math.random()*(b-a),ri=(a,b)=>Math.floor(rnd(a,b+1)),pick=a=>a[Math.floor(Math.random()*a.length)];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 let tick=0,loaded=0,toLoad=0;
@@ -203,13 +208,25 @@ const tk=s=>TOUCH&&!KEYB?s.replace(/ENTRÉE/g,'POING').replace(/ÉCHAP/g,'PAUSE'
   document.querySelectorAll('[data-k]').forEach(b=>{const c=b.dataset.k,up=()=>{setKey(c,false);b.classList.remove('on');};
     b.addEventListener('pointerdown',e=>{e.preventDefault();setKey(c,true);b.classList.add('on');try{b.setPointerCapture(e.pointerId);}catch(_){}});
     b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);});
-  $('bm').addEventListener('click',()=>{muted=!muted;$('bm').classList.toggle('on',muted);});
+  // SON et ÉCRAN réagissent au relâchement du doigt (le « clic » est neutralisé plus bas pour bloquer le zoom)
+  const tap=(el,fn)=>{let t0=0;const h=e=>{if(e.type==='click'&&performance.now()-t0<700)return;if(e.type==='pointerup')t0=performance.now();fn();};el.addEventListener('pointerup',h);el.addEventListener('click',h);};
+  tap($('bm'),()=>{muted=!muted;$('bm').classList.toggle('on',muted);});
   const de=document.documentElement;
-  if(de.requestFullscreen)$('bf').addEventListener('click',()=>{if(document.fullscreenElement)document.exitFullscreen();else de.requestFullscreen().then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(_){}}).catch(()=>{});});
+  if(de.requestFullscreen)tap($('bf'),()=>{if(document.fullscreenElement)document.exitFullscreen();else de.requestFullscreen().then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(_){}}).catch(()=>{});});
   else $('bf').style.display='none';
   cv.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&scene!=='fight')press.Enter=1;});
   addEventListener('contextmenu',e=>{if(TOUCH)e.preventDefault();});
-  addEventListener('gesturestart',e=>e.preventDefault());
+  // ---- la page ne doit ni zoomer ni défiler : pincement, double appui, glissement ----
+  const stop=e=>{if(e.cancelable)e.preventDefault();};
+  ['gesturestart','gesturechange','gestureend','dblclick'].forEach(n=>document.addEventListener(n,stop,{passive:false}));
+  ['touchstart','touchmove','touchend'].forEach(n=>document.addEventListener(n,stop,{passive:false}));
+  addEventListener('wheel',e=>{if(e.ctrlKey)stop(e);},{passive:false});
+  // si la page se retrouve zoomée ou décalée malgré tout, on la remet d'aplomb
+  const vm=document.querySelector('meta[name=viewport]'),vv=window.visualViewport;let zt=0;
+  function unzoom(){if(scrollX||scrollY)scrollTo(0,0);if(!vv||!vm||!TOUCH)return;
+    if(vv.scale>1.01&&performance.now()-zt>400){zt=performance.now();const c=vm.getAttribute('content');vm.setAttribute('content',c+',initial-scale=1.0001');setTimeout(()=>{vm.setAttribute('content',c);fit();},60);}}
+  if(vv){vv.addEventListener('resize',unzoom);vv.addEventListener('scroll',unzoom);}
+  addEventListener('scroll',unzoom);
 })();
 addEventListener('blur',()=>{for(const k in down)down[k]=0;});
 function readInp(i,both){const c=CTRL[i],o={l:down[c.l],r:down[c.r],u:down[c.u],d:down[c.d],p:press[c.p],k:press[c.k],s:press[c.s]};
