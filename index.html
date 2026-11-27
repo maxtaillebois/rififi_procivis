@@ -418,7 +418,7 @@ function sTitle(){
   txt(TOUCH&&!KEYB?'TOUCHE TON CHOIX, OU CROIX PUIS VALIDER':'ENTRÉE : VALIDER     M : SON     F11 : PLEIN ÉCRAN',320,TOUCH&&!KEYB?314:340,{a:'c',c:'#c0c4e0'});
   if(st.msg>st.t)txt('LE DUEL SE JOUE À DEUX SUR UN CLAVIER.',320,296,{a:'c',c:YEL,o:'#1a1020'});
   if(TAP&&TAP.x>196&&TAP.x<444)for(let i=0;i<3;i++)if(TAP.y>=194+i*28&&TAP.y<194+(i+1)*28){st.i=i;press.Enter=1;}
-  if(kOK()||press.KeyF){SFX.ok();if(st.i===2)go('help');else if(st.i===1&&TOUCH&&!KEYB){st.msg=st.t+150;}else{mode=st.i+1;go('select',{c:[sel[0],mode===2?sel[1]:-1],ok:[false,mode===1]});}}
+  if(kOK()||press.KeyF){SFX.ok();if(st.i===2)go('help');else if(st.i===1&&TOUCH&&!KEYB){st.msg=st.t+150;}else{mode=st.i+1;go('select',{c:[sel[0],mode===2?(sel[1]<0||sel[1]===sel[0]?(sel[0]+2)%CH.length:sel[1]):-1],ok:[false,false]});}}
 }
 function sHelp(){
   stripes('#3a1030','#44123a');frame(60,30,520,300,YEL);txt('COMMANDES',320,40,{k:3,a:'c',c:YEL});
@@ -433,46 +433,87 @@ function sHelp(){
 }
 function sSelect(){
   playSong('menu');stripes('#1c1440','#221a4c');
-  txt(mode===1?'CHOISIS TON ARTISTE':'CHOISISSEZ VOS ARTISTES',320,8,{k:3,a:'c',c:YEL,o:'#1a1020'});
-  const mv=(p,dl,dr,du,dd,ok)=>{if(st.ok[p])return;let c=st.c[p];const o=c,col=c%5,row=c>=5?1:0;
-    if(dl)c=row*5+(col+4)%5;if(dr)c=row*5+(col+1)%5;if(du||dd)c=(1-row)*5+col;if(c!==o){st.c[p]=c;SFX.blip();}
-    if(ok){st.ok[p]=true;SFX.ok();}};
-  if(TAP){const p=st.ok[0]&&mode===2?1:0;
+  const solo=mode===1,ph=solo&&st.ok[0]?1:0;                       // en solo : 0 = on choisit son artiste, 1 = son adversaire
+  txt(solo?(ph?'CHOISIS TON ADVERSAIRE':'CHOISIS TON ARTISTE'):'CHOISISSEZ VOS ARTISTES',320,8,{k:3,a:'c',c:YEL,o:'#1a1020'});
+  // en solo, la case « ? » (panneau de droite) vaut -1 : adversaire tiré au sort
+  const mv=(p,dl,dr,du,dd,ok)=>{if(st.ok[p])return;let c=st.c[p];const o=c,rnd=solo&&p===1;
+    if(c<0){if(dl)c=4;if(dr)c=0;}
+    else{const col=c%5,row=c>=5?1:0;
+      if(dl)c=rnd&&col===0?-1:row*5+(col+4)%5;if(dr)c=rnd&&col===4?-1:row*5+(col+1)%5;if(du||dd)c=(1-row)*5+col;}
+    if(c!==o){st.c[p]=c;SFX.blip();}
+    if(ok){if(rnd&&c===st.c[0]){SFX.blip();return;}st.ok[p]=true;SFX.ok();}};
+  if(TAP){const p=st.ok[0]?1:0,rnd=solo&&p===1;
     for(let i=0;i<CH.length;i++){const x=154+(i%5)*67,y=136+Math.floor(i/5)*108;
-      if(TAP.x>=x-2&&TAP.x<x+66&&TAP.y>=y-2&&TAP.y<y+104&&!st.ok[p]){if(st.c[p]===i)mv(p,0,0,0,0,true);else{st.c[p]=i;SFX.blip();}}}
-    const px=p?496:8;if(TAP.x>=px&&TAP.x<px+136&&TAP.y>=52&&TAP.y<352&&st.c[p]>=0)mv(p,0,0,0,0,true);}
-  if(mode===1)mv(0,press.KeyA||press.ArrowLeft,press.KeyD||press.ArrowRight,press.KeyW||press.ArrowUp,press.KeyS||press.ArrowDown,press.KeyF||kOK());
+      if(TAP.x>=x-2&&TAP.x<x+66&&TAP.y>=y-2&&TAP.y<y+104&&!st.ok[p]){if(rnd&&i===st.c[0])SFX.blip();else if(st.c[p]===i)mv(p,0,0,0,0,true);else{st.c[p]=i;SFX.blip();}}}
+    const px=p?496:8;if(TAP.x>=px&&TAP.x<px+136&&TAP.y>=52&&TAP.y<352&&!st.ok[p]){
+      if(rnd&&st.c[1]>=0){st.c[1]=-1;SFX.blip();}else if(rnd||st.c[p]>=0)mv(p,0,0,0,0,true);}}
+  if(solo)mv(ph,press.KeyA||press.ArrowLeft,press.KeyD||press.ArrowRight,press.KeyW||press.ArrowUp,press.KeyS||press.ArrowDown,press.KeyF||kOK());
   else{mv(0,press.KeyA,press.KeyD,press.KeyW,press.KeyS,press.KeyF);mv(1,press.ArrowLeft,press.ArrowRight,press.ArrowUp,press.ArrowDown,press.KeyI||press.Enter);}
-  if(kBack()){SFX.blip();if(mode===2&&(st.ok[0]||st.ok[1]))st.ok=[false,false];else return go('title');}
-  for(let p=0;p<2;p++){const x=p?496:8,c=st.c[p]>=0?CH[st.c[p]]:null,col=p?YEL:PINK;
-    frame(x,52,136,300,col);
+  if(kBack()){SFX.blip();if(st.ok[0]||st.ok[1]){st.ok=[false,false];st.w=0;}else return go('title');}
+  for(let p=0;p<2;p++){const x=p?496:8,c=st.c[p]>=0?CH[st.c[p]]:null,col=p?YEL:PINK,cur=solo&&p===1&&ph===1&&!st.ok[1]&&!c;
+    frame(x,52,136,300,cur&&(tick>>2)&1?'#ffffff':col);
     g.save();g.beginPath();g.rect(x,52,136,300);g.clip();
     R(p?'#3a3010':'#3a1030',x,52,136,300);R('#0e0a1c',x,300,136,52);
     if(c){shadow(x+68,70);drawSprite(c,st.ok[p]?25+((tick>>4)&1):((tick>>3)&3),x+68+(p?10:-10),FLOOR-4,p?-1:1);}
     else txt('?',x+68,130,{k:8,a:'c',c:'#ffffff'});
     g.restore();
-    txt(p?(mode===1?'ADVERSAIRE':'JOUEUR 2'):'JOUEUR 1',x+68,56,{a:'c',c:col});
-    if(c){wrap(c.name,x+68,322,130,{a:'c',c:'#ffffff'},11);}else txt('SURPRISE DU CHEF',x+68,326,{a:'c',c:'#aab0d0'});
-    if(st.ok[p]&&c)txt('PRÊT !',x+68,74,{k:2,a:'c',c:(tick>>3)&1?'#ffffff':col,o:'#1a1020'});
+    txt(p?(solo?'ADVERSAIRE':'JOUEUR 2'):'JOUEUR 1',x+68,56,{a:'c',c:col});
+    if(c){wrap(c.name,x+68,322,130,{a:'c',c:'#ffffff'},11);}else txt(solo?'AU HASARD':'SURPRISE DU CHEF',x+68,326,{a:'c',c:cur?'#ffffff':'#aab0d0'});
+    if(st.ok[p]&&(c||solo))txt('PRÊT !',x+68,74,{k:2,a:'c',c:(tick>>3)&1?'#ffffff':col,o:'#1a1020'});
   }
   // fiche de l'artiste survolé
   frame(154,52,332,74,'#5a4a8a');
   for(let p=0;p<2;p++){const c=st.c[p]>=0?CH[st.c[p]]:null,x=p?324:160,col=p?YEL:PINK;if(!c)continue;
     txt('COUP SPÉCIAL',x,58,{c:'#8088b0'});txt(c.sp,x,70,{c:col});wrap('« '+c.qi+' »',x,88,154,{c:'#ffffff'},11);}
-  if(mode===1){txt('9 ADVERSAIRES T\'ATTENDENT',405,TOUCH&&!KEYB?72:82,{a:'c',c:'#aab0d0'});if(TOUCH&&!KEYB){txt('TOUCHE UN PORTRAIT,',405,90,{a:'c',c:YEL});txt('PUIS VALIDER',405,102,{a:'c',c:YEL});}}
+  if(solo&&st.c[1]<0){const tc=TOUCH&&!KEYB;
+    if(!ph){txt('PUIS TU CHOISIRAS',405,tc?66:76,{a:'c',c:'#aab0d0'});txt('TON ADVERSAIRE ET LE DÉCOR',405,tc?78:88,{a:'c',c:'#aab0d0'});if(tc){txt('TOUCHE UN PORTRAIT,',405,96,{a:'c',c:YEL});txt('PUIS VALIDER',405,108,{a:'c',c:YEL});}}
+    else{txt('ADVERSAIRE AU HASARD',405,66,{a:'c',c:YEL});txt(tc?'OU TOUCHE UN PORTRAIT':'OU CHOISIS UN PORTRAIT',405,84,{a:'c',c:'#aab0d0'});txt(tc?'PUIS VALIDER':'ENTRÉE : VALIDER',405,96,{a:'c',c:'#aab0d0'});}}
   CH.forEach((c,i)=>{const x=154+(i%5)*67,y=136+Math.floor(i/5)*108;R(OUT,x-2,y-2,68,104);g.drawImage(c.por,8,0,64,100,x,y,64,100);
+    if(ph&&i===st.c[0])R('rgba(14,10,28,.6)',x,y,64,100);
     for(let p=0;p<2;p++)if(st.c[p]===i){const col=p?YEL:PINK;if(st.ok[p]||(tick>>2)&1){const o=p*3;R(col,x-3+o,y-3+o,70-2*o,3);R(col,x-3+o,y+100-o,70-2*o,3);R(col,x-3+o,y-3+o,3,106-2*o);R(col,x+64-o,y-3+o,3,106-2*o);}
-      txt(p?'J2':'J1',p?x+44:x+3,y+86,{c:col,o:'#1a1020'});}
+      txt(p?(solo?'ADV':'J2'):'J1',p?x+(solo?38:44):x+3,y+86,{c:col,o:'#1a1020'});}
   });
-  if(st.ok[0]&&st.ok[1]){st.w=(st.w||0)+1;if(st.w>40){sel=[st.c[0],mode===2?st.c[1]:sel[1]];
-    if(mode===1){ladder=shuf(CH.map((c,i)=>i).filter(i=>i!==sel[0]));if(ladder[0]===lastFirst){const j=1+Math.floor(Math.random()*(ladder.length-1));[ladder[0],ladder[j]]=[ladder[j],ladder[0]];}lastFirst=ladder[0];try{localStorage.setItem('rififi1',lastFirst);}catch(e){}step=0;startMatch(sel[0],ladder[0]);}else startMatch(sel[0],sel[1]);}}
+  if(st.ok[0]&&st.ok[1]){st.w=(st.w||0)+1;if(st.w>30){sel=[st.c[0],solo?sel[1]:st.c[1]];go('stage',{a:st.c[0],b:st.c[1],i:0});}}
+}
+/* ---- choix du décor : case 0 = au hasard, cases 1 à 5 = les cinq décors ---- */
+let THUMBS=null;
+function thumbs(){if(!THUMBS)THUMBS=STAGES.map(s=>{const c=document.createElement('canvas');c.width=144;c.height=81;const x=c.getContext('2d');
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(s.far,80,0,640,360,0,0,144,81);x.drawImage(s.near,160,0,640,360,0,0,144,81);return c;});return THUMBS;}
+function sStage(){
+  playSong('menu');stripes('#1c1440','#221a4c');
+  const solo=mode===1,tc=TOUCH&&!KEYB,T=thumbs(),pos=i=>[96+(i%3)*152,44+Math.floor(i/3)*104];
+  txt('CHOISIS LE DÉCOR',320,6,{k:2,a:'c',c:YEL,o:'#1a1020'});
+  let i=st.i;const o=i,col=i%3,row=i>=3?1:0;
+  if(press.KeyA||press.ArrowLeft)i=row*3+(col+2)%3;if(press.KeyD||press.ArrowRight)i=row*3+(col+1)%3;
+  if(press.KeyW||press.ArrowUp||press.KeyS||press.ArrowDown)i=(1-row)*3+col;
+  let ok=kOK()||press.KeyF||press.KeyI;
+  if(TAP)for(let k=0;k<6;k++){const [x,y]=pos(k);if(TAP.x>=x-3&&TAP.x<x+147&&TAP.y>=y-3&&TAP.y<y+96){if(i===k)ok=true;else i=k;}}
+  if(i!==o){st.i=i;SFX.blip();}
+  for(let k=0;k<6;k++){const [x,y]=pos(k),on=k===st.i;
+    R(on?((tick>>2)&1||st.ok?YEL:'#ffffff'):OUT,x-3,y-3,150,87);
+    if(k){g.drawImage(T[k-1],x,y);}else{R('#3a1030',x,y,144,81);txt('?',x+72,y+8,{k:5,a:'c',c:'#ffffff'});}
+    txt(k?STAGES[k-1].name:'AU HASARD',x+72,y+86,{a:'c',c:on?YEL:'#c0c4e0'});}
+  const A1=CH[st.a].name,B1=st.b>=0?CH[st.b].name:'ADVERSAIRE AU HASARD';
+  txt(A1+'   VS   '+B1,320,264,{a:'c',c:'#ffffff'});
+  if(solo)txt(st.b>=0?'PUIS LES 8 AUTRES, TIRÉS AU SORT':'9 ADVERSAIRES TIRÉS AU SORT',320,278,{a:'c',c:'#aab0d0'});
+  if(!st.ok&&(tick>>4)&1)txt(tc?'TOUCHE UN DÉCOR, PUIS VALIDER':'ENTRÉE : VALIDER     ÉCHAP : RETOUR',320,300,{k:2,a:'c',c:'#ffffff'});
+  if(st.ok){st.w=(st.w||0)+1;if(st.w>24){const sN=st.i-1,a=st.a,b=st.b;
+    if(solo){ladder=shuf(CH.map((c,i)=>i).filter(i=>i!==a));
+      if(b>=0){ladder.splice(ladder.indexOf(b),1);ladder.unshift(b);}
+      else if(ladder[0]===lastFirst){const j=1+Math.floor(Math.random()*(ladder.length-1));[ladder[0],ladder[j]]=[ladder[j],ladder[0]];}
+      lastFirst=ladder[0];try{localStorage.setItem('rififi1',lastFirst);}catch(e){}step=0;startMatch(a,ladder[0],sN);}
+    else startMatch(a,b,sN);}return;}
+  if(kBack()){SFX.blip();return go('select',{c:[st.a,st.b],ok:[solo,false]});}
+  if(ok){st.ok=true;SFX.ok();}
 }
 // tirage au sort équitable (mélange de Fisher-Yates) : adversaires et décors
 function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 let lastFirst=-1,stBag=[];try{const v=localStorage.getItem('rififi1');if(v!==null&&v!=='')lastFirst=+v;}catch(e){}
-function startMatch(a,b){
+function startMatch(a,b,sN){
   P=[newFighter(CH[a],0,false),newFighter(CH[b],1,mode===1)];
-  if(!stBag.length){stBag=shuf([0,1,2,3,4]);if(stBag[4]===stageN)[stBag[0],stBag[4]]=[stBag[4],stBag[0]];}stageN=stBag.pop();stage=STAGES[stageN];
+  if(sN>=0){stageN=sN;const k=stBag.indexOf(sN);if(k>=0)stBag.splice(k,1);}                // décor choisi
+  else{if(!stBag.length){stBag=shuf([0,1,2,3,4]);if(stBag[4]===stageN)[stBag[0],stBag[4]]=[stBag[4],stBag[0]];}stageN=stBag.pop();}
+  stage=STAGES[stageN];
   fight={round:1,phase:'intro',pt:0,time:60*60,msg:''};resetRound();go('vs');
 }
 function sVS(){
@@ -618,7 +659,7 @@ function sResult(){
       if(w===0)step++;startMatch(sel[0],ladder[step]);}
   }
 }
-const SC={title:sTitle,help:sHelp,select:sSelect,vs:sVS,fight:sFight,result:sResult};
+const SC={title:sTitle,help:sHelp,select:sSelect,stage:sStage,vs:sVS,fight:sFight,result:sResult};
 function levelFor(){const i=mode===1?step:0;return{block:Math.min(.8,.12+.07*i),aggr:Math.min(.9,.34+.06*i),think:Math.max(6,26-2.2*i)|0};}
 
 /* ---------------- Boucle ---------------- */
