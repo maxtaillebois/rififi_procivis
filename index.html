@@ -406,7 +406,8 @@ const demo=[{x:120,y:FLOOR,dir:1,st:'idle',t:0,ph:0,ch:CH[1]},{x:520,y:FLOOR,dir
 
 function sTitle(){
   playSong('menu');
-  const pan=160+Math.sin(st.t/260)*150,s=STAGES[Math.floor(st.t/720)%STAGES.length];drawStage(s,pan);R('rgba(10,6,26,.55)',0,0,W,H);
+  const pan=160+Math.sin(st.t/260)*150,s=STAGES.find(s=>s.id==='bnf');drawStage(s,pan);   // accueil : toujours l'esplanade de la BnF
+ R('rgba(10,6,26,.55)',0,0,W,H);
   if(st.t%300===1){demo[0].ch=pick(CH);demo[1].ch=pick(CH.filter(c=>c!==demo[0].ch));}
   demo.forEach(f=>{f.st=(st.t%300>240)?'win':'idle';shadow(f.x,70);drawFighter(f);});
   const y=20+Math.round(Math.sin(tick/20)*3);
